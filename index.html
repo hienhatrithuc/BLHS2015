@@ -6,147 +6,205 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Tra cứu Bộ luật Hình sự</title>
 <style>
-body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; margin:0; padding:20px; background-color:#f5f5f5;}
-#search-container { background:white; padding:20px; border-radius:12px; box-shadow:0 4px 6px rgba(0,0,0,0.1); margin-bottom:20px; display:flex; flex-direction:column; align-items:center;}
-#search-box, #chapter-select { width:90%; padding:10px; font-size:18px; border:1px solid #ccc; border-radius:8px; margin-bottom:10px;}
-#search-btn { padding:10px 20px; font-size:18px; border:none; background-color:#007aff; color:white; border-radius:8px; cursor:pointer; width:90%;}
-#search-btn:hover { background-color:#005bb5;}
-#results { margin-top:20px;}
-.highlight { background-color:yellow; font-weight:bold;}
-.article { background:white; padding:20px; margin-bottom:20px; border-radius:12px; box-shadow:0 2px 6px rgba(0,0,0,0.08); text-align:justify; line-height:1.6;}
-.article p { text-indent:2em; margin-bottom:10px;}
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; margin:0; padding-top:90px; background-color:#f5f5f5; }
+#search-bar { 
+    position: fixed; 
+    top: 0; 
+    left: 0; 
+    width: 100%; 
+    background-color: #ffffff; 
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1); 
+    padding: 10px; 
+    display: flex; 
+    align-items: center; 
+    justify-content: center; 
+    z-index: 1000; 
+    box-sizing: border-box;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+#search-bar button, #search-bar input {
+    padding: 10px;
+    font-size: 18px;
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    box-sizing: border-box;
+}
+#search-bar button {
+    background-color: #007aff;
+    color: white;
+    cursor: pointer;
+}
+#search-bar button:hover {
+    background-color: #005bb5;
+}
+.search-container {
+    position: relative;
+    flex: 1 1 150px;
+    min-width: 150px;
+}
+#search-box {
+    width: 100%;
+    padding-right: 40px;
+}
+.search-icon {
+    position: absolute;
+    top: 50%;
+    right: 10px;
+    transform: translateY(-50%);
+    font-size: 20px;
+    color: #888;
+    cursor: pointer;
+}
+#results { margin: 20px; }
+#summary { margin: 10px 20px; font-size: 18px; }
+.highlight { background-color:yellow; font-weight:bold; }
+.article { background:white; padding:20px; margin-bottom:20px; border-radius:12px; box-shadow:0 2px 6px rgba(0,0,0,0.08); text-align:justify; line-height:1.6; }
+.article p { text-indent:2em; margin-bottom:10px; }
 .article h3 { margin-bottom:15px; }
-#nav-buttons { margin-top:10px; display:flex; justify-content:center; gap:10px;}
-button.nav-btn { padding:10px 20px; font-size:16px; cursor:pointer; background-color:#007aff; color:white; border:none; border-radius:8px;}
-#counter { margin-top:10px; font-size:16px; text-align:center;}
+h2 { color:#007aff; margin-top:30px; }
+.loader {
+  border: 4px solid #f3f3f3;
+  border-top: 4px solid #007aff;
+  border-radius: 50%;
+  width: 24px;
+  height: 24px;
+  animation: spin 1s linear infinite;
+  display: none;
+}
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
 </style>
 </head>
 <body>
 
-<div id="search-container">
-<select id="chapter-select">
-<option value="">Tất cả chương</option>
-</select>
-<input type="text" id="search-box" placeholder="Nhập từ khóa tìm kiếm...">
-<button id="search-btn">Tìm kiếm</button>
-<div id="nav-buttons">
-<button id="prev-btn" class="nav-btn">Previous</button>
-<span id="counter"></span>
-<button id="next-btn" class="nav-btn">Next</button>
-</div>
+<div id="search-bar">
+    <button id="prev-btn" title="Kết quả trước">&lt;</button>
+    <button id="next-btn" title="Kết quả tiếp theo">&gt;</button>
+    <button id="top-btn" title="Lên đầu trang">^</button>
+    <div class="search-container">
+        <input type="text" id="search-box" placeholder="Nhập từ khóa...">
+        <span class="search-icon" id="search-icon">🔍</span>
+    </div>
+    <div id="loading" class="loader"></div>
 </div>
 
+<div id="summary"></div>
 <div id="results"></div>
 
 <script>
 let articles = [];
-let matches = [];
-let currentIndex = 0;
-const chapterFullNames = [
-"Chương I. Những quy định chung",
-"Chương II. Hiệu lực của Bộ luật hình sự",
-"Chương III. Tội phạm",
-"Chương IV. Hình phạt",
-"Chương V. Quyết định hình phạt",
-"Chương VI. Các biện pháp tư pháp",
-"Chương VII. Xóa án tích",
-"Chương VIII. Những quy định đối với người dưới 18 tuổi phạm tội",
-"Chương IX. Các tội xâm phạm quyền bình đẳng của con người, của công dân",
-"Chương X. Các tội xâm phạm tính mạng, sức khỏe, nhân phẩm, danh dự của con người",
-"Chương XI. Các tội xâm phạm quyền tự do của con người, quyền tự do dân chủ của công dân",
-"Chương XII. Các tội xâm phạm sở hữu",
-"Chương XIII. Các tội xâm phạm chế độ hôn nhân và gia đình",
-"Chương XIV. Các tội xâm phạm trật tự quản lý kinh tế",
-"Chương XV. Các tội phạm về môi trường",
-"Chương XVI. Các tội xâm phạm an toàn công cộng, trật tự công cộng",
-"Chương XVII. Các tội xâm phạm trật tự quản lý hành chính",
-"Chương XVIII. Các tội về ma túy",
-"Chương XIX. Các tội về tham nhũng",
-"Chương XX. Các tội phạm chức vụ",
-"Chương XXI. Các tội xâm phạm hoạt động tư pháp",
-"Chương XXII. Các tội về quốc phòng, an ninh, đối ngoại",
-"Chương XXIII. Các tội về an toàn giao thông vận tải, bưu chính viễn thông, công nghệ thông tin",
-"Chương XXIV. Các tội về phòng chống dịch bệnh, thiên tai, sự cố",
-"Chương XXV. Các tội khác liên quan đến nghĩa vụ quân sự",
-"Chương XXVI. Các tội khác liên quan đến an toàn xã hội"
-];
+let filteredArticles = [];
+let searchKeyword = '';
+let currentMatchIndex = -1;
+let matchElements = [];
 
 fetch('bo_luat_hinh_su.json')
 .then(response => response.json())
 .then(data => {
     articles = data;
-    populateChapters();
+    displayAllArticles();
 });
 
-function populateChapters() {
-    const chapterSelect = document.getElementById('chapter-select');
-    chapterFullNames.forEach(chapter => {
-        const option = document.createElement('option');
-        option.value = chapter.split('.')[0].trim();
-        option.textContent = chapter;
-        chapterSelect.appendChild(option);
-    });
-}
-
 function highlightKeyword(text, keyword) {
-    let regex = new RegExp('(' + keyword + ')', 'gi');
+    if (!keyword) return text;
+    let regex = new RegExp('(' + keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')', 'gi');
     return text.replace(regex, '<span class="highlight">$1</span>');
 }
 
-function formatNoiDung(text) {
-    text = text.replace(/(?<!\n)(\d+\.\s)/g, '\n$1'); // (1) xuống dòng
-    text = text.replace(/(?<!\n)([a-z]\))/g, '\n$1');   // (a) xuống dòng
+function formatNoiDung(text, keyword) {
+    text = text.replace(/(?<!\n)(\d+\.\s)/g, '\n$1');
+    text = text.replace(/(?<!\n)([a-z]\))/g, '\n$1');
     const parts = text.trim().split('\n');
-    return parts.map(p => `<p>${p.trim()}</p>`).join('\n');
+    return parts.map(p => `<p>${highlightKeyword(p.trim(), keyword)}</p>`).join('\n');
 }
 
-function displayResult(index) {
-    if (matches.length > 0) {
-        const {dieu, noi_dung} = matches[index];
-        const formattedContent = formatNoiDung(noi_dung);
-        document.getElementById('results').innerHTML = `
+function displayAllArticles() {
+    const container = document.getElementById('results');
+    container.innerHTML = '';
+    articles.forEach(article => {
+        container.innerHTML += `
         <div class="article">
-            <h3>${dieu}</h3>
-            ${formattedContent}
+            <h3>${article.dieu}</h3>
+            ${formatNoiDung(article.noi_dung, '')}
         </div>`;
-        document.getElementById('counter').innerText = `${index + 1} / ${matches.length} kết quả`;
-    } else {
-        document.getElementById('results').innerHTML = '<p>Không tìm thấy kết quả.</p>';
-        document.getElementById('counter').innerText = '';
-    }
+    });
+    document.getElementById('summary').innerText = '';
 }
 
 function search() {
     const keyword = document.getElementById('search-box').value.trim();
-    const selectedChapter = document.getElementById('chapter-select').value;
+    searchKeyword = keyword;
     if (!keyword) {
-        document.getElementById('results').innerHTML = '';
-        matches = [];
-        document.getElementById('counter').innerText = '';
+        displayAllArticles();
         return;
     }
-    matches = articles
-        .filter(article => {
-            if (!selectedChapter) return true;
-            return article.noi_dung.includes(selectedChapter);
-        })
-        .map(article => ({
-            dieu: highlightKeyword(article.dieu, keyword),
-            noi_dung: highlightKeyword(article.noi_dung, keyword)
-        }))
-        .filter(article => article.dieu.includes('<span') || article.noi_dung.includes('<span'));
-
-    currentIndex = 0;
-    displayResult(currentIndex);
+    document.getElementById('loading').style.display = 'inline-block';
+    setTimeout(() => {
+        filteredArticles = articles.filter(a => 
+            a.dieu.toLowerCase().includes(keyword.toLowerCase()) || 
+            a.noi_dung.toLowerCase().includes(keyword.toLowerCase())
+        );
+        currentMatchIndex = 0;
+        displayFilteredArticles();
+        document.getElementById('loading').style.display = 'none';
+    }, 300);
 }
 
-document.getElementById('search-btn').addEventListener('click', search);
+function displayFilteredArticles() {
+    const container = document.getElementById('results');
+    const summary = document.getElementById('summary');
+    container.innerHTML = '';
+    if (filteredArticles.length === 0) {
+        summary.innerText = 'Không tìm thấy kết quả.';
+        return;
+    }
+    summary.innerText = `Đã tìm thấy ${filteredArticles.length} kết quả.`;
+    filteredArticles.forEach((article, index) => {
+        container.innerHTML += `
+        <div class="article">
+            <h3>${index + 1}. ${highlightKeyword(article.dieu, searchKeyword)}</h3>
+            ${formatNoiDung(article.noi_dung, searchKeyword)}
+        </div>`;
+    });
+    matchElements = Array.from(document.querySelectorAll('.highlight'));
+    scrollToMatch();
+}
+
+function scrollToMatch() {
+    if (matchElements.length > 0 && currentMatchIndex >= 0 && currentMatchIndex < matchElements.length) {
+        matchElements[currentMatchIndex].scrollIntoView({behavior: 'smooth', block: 'center'});
+    }
+}
+
 document.getElementById('prev-btn').addEventListener('click', () => {
-    if (currentIndex > 0) { currentIndex--; displayResult(currentIndex); }
+    if (matchElements.length > 0 && currentMatchIndex > 0) {
+        currentMatchIndex--;
+        scrollToMatch();
+    }
 });
 document.getElementById('next-btn').addEventListener('click', () => {
-    if (currentIndex < matches.length - 1) { currentIndex++; displayResult(currentIndex); }
+    if (matchElements.length > 0 && currentMatchIndex < matchElements.length - 1) {
+        currentMatchIndex++;
+        scrollToMatch();
+    }
 });
+document.getElementById('top-btn').addEventListener('click', () => {
+    window.scrollTo({top: 0, behavior: 'smooth'});
+});
+document.getElementById('search-icon').addEventListener('click', search);
+document.getElementById('search-box').addEventListener('keyup', function(event) {
+    if (event.key === 'Enter') {
+        search();
+    }
+});
+
+// Auto focus vào ô tìm kiếm
+window.onload = function() {
+    document.getElementById('search-box').focus();
+};
 </script>
 
 </body>
